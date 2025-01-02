@@ -1,5 +1,7 @@
 name: Deploy to development stand
 
+concurrency: deploy
+
 on:
   workflow_dispatch:
     inputs:
@@ -46,6 +48,7 @@ jobs:
   deploy:
     needs: build-and-push-image
     runs-on: ubuntu-latest
+    environment: dev
     steps:
     - name: Checkout
       uses: actions/checkout@v4
@@ -57,10 +60,17 @@ jobs:
     - name: Prepare configuration
       run: |
         echo ENV=DEV >> .env;
-        echo TELEGRAM_TOKEN=${{ secrets.DEV_TG_TOKEN }} >> .env;
-        echo ENCRYPTION='${{ secrets.DEV_ENCRYPTION }}' >> .env;
-        echo VERSION=$(git rev-parse --short HEAD) >> .env;
-        echo ENABLE_PROMETHEUS_METRICS_SERVER= >> .env;
+        echo ENABLE_PROMETHEUS_METRICS_SERVER=1 >> .env;
+        echo VERSION=${{github.run_number}}-$(git rev-parse --short HEAD) >> .env;
+
+        echo TELEGRAM_TOKEN='${{ secrets.TG_TOKEN }}' >> .env;
+        echo ENCRYPTION='${{ secrets.ENCRYPTION }}' >> .env;
+
+        echo POSTGRES_DB='${{ vars.POSTGRES_DB }}' >> .env;
+        echo POSTGRES_USER='${{ vars.POSTGRES_USER }}' >> .env;
+        echo POSTGRES_PASSWORD='${{ secrets.POSTGRES_PASSWORD }}' >> .env;
+        echo POSTGRES_HOST='${{ vars.POSTGRES_HOST }}' >> .env;
+
         export DOCKER_TAG=dev;
 
     - name: Enable DEBUG logs
@@ -76,17 +86,16 @@ jobs:
     - name: Configure Docker Host
       uses: khaledez/configure-docker-host@v2
       with:
-        host: ${{ secrets.DEV_HOST }}
-        user: ${{ secrets.DEV_SSH_USER }}
-        ssh-private-key: ${{ secrets.DEV_SSH_KEY }}
+        host: ${{ secrets.HOST }}
+        user: ${{ secrets.SSH_USER }}
+        ssh-private-key: ${{ secrets.SSH_KEY }}
 
     - name: Pull & Reload
       run: |
           docker compose \
           -p samowarium-dev \
           up -d \
-          --pull always \
-          samowarium
+          --pull always
 
     - name: Prune images
       run: |
