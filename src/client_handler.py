@@ -278,11 +278,16 @@ class UserHandler:
         """
         Для каждого пользователя интервал ревалидации свой,
         чтобы размазать нагрузку по ревалидации во времени.
-        Для каждого пользователя дельта для ревалидации составляет от 4.5 до 5 часов. 
+        Для каждого пользователя дельта для ревалидации составляет от 4.5 до 5 часов.
         """
         hash_key = str(self.context.telegram_id) + self.context.samoware_login
         interval = 30
-        diff = -interval + int(hashlib.sha256(hash_key.encode('utf-8')).hexdigest(), 16) % interval
+        diff = (
+            -interval
+            + int(hashlib.sha256(hash_key.encode("utf-8")).hexdigest(), 16) % interval
+        )
         revalidation_interval = REVALIDATION_INTERVAL + timedelta(minutes=diff)
-        log.debug(f"setting revalidation shift for user {self.context.telegram_id} for {revalidation_interval}")
+        log.debug(
+            f"setting revalidation shift for user {self.context.telegram_id} for {revalidation_interval}"
+        )
         return revalidation_interval
