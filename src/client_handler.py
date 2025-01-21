@@ -3,6 +3,7 @@ import logging as log
 from datetime import datetime, timedelta, timezone
 import re
 from typing import Self
+import hashlib
 
 import aiohttp
 from context import Context
@@ -29,7 +30,7 @@ from metrics import (
     incoming_letter_metric,
 )
 
-REVALIDATE_INTERVAL = timedelta(hours=5)
+REVALIDATION_INTERVAL = timedelta(hours=5)
 SESSION_TOKEN_PATTERN = re.compile("^[0-9]{6}-[a-zA-Z0-9]{20}$")
 
 SUCCESSFUL_LOGIN_PROMPT = (
@@ -53,6 +54,7 @@ class UserHandler:
         self.message_sender = message_sender
         self.db = db
         self.context = context
+        self.revalidation_delta = self.make_user_based_revalidation_delta()
 
     @classmethod
     async def make_new(
@@ -126,19 +128,11 @@ class UserHandler:
                                     polling_context, mail_header.uid
                                 )
                     self.context.polling_context = polling_context
-                    if datetime.astimezone(
-                        self.context.last_revalidation + REVALIDATE_INTERVAL,
-                        timezone.utc,
-                    ) < datetime.now(timezone.utc):
-                        is_successful_revalidation = await self.revalidate()
-                        revalidation_metric.labels(
-                            is_successful=is_successful_revalidation
-                        ).inc()
-                        if not is_successful_revalidation:
-                            await self.can_not_revalidate()
-                            await self.db.remove_user(self.context.telegram_id)
-                            forced_logout_metric.inc()
-                            return
+                    if not await self.check_revalidation():
+                        await self.can_not_revalidate()
+                        await self.db.remove_user(self.context.telegram_id)
+                        forced_logout_metric.inc()
+                        return
                     retry_count = 0
                 except asyncio.CancelledError:
                     return
@@ -210,6 +204,16 @@ class UserHandler:
                 retry_count += 1
                 await asyncio.sleep(HTTP_RETRY_DELAY_SEC)
 
+    async def check_revalidation(self) -> bool:
+        if datetime.astimezone(
+            self.context.last_revalidation + self.revalidation_delta,
+            timezone.utc,
+        ) < datetime.now(timezone.utc):
+            is_successful_revalidation = await self.revalidate()
+            revalidation_metric.labels(is_successful=is_successful_revalidation).inc()
+            return is_successful_revalidation
+        return True
+
     async def revalidate(self) -> bool:
         log.debug("trying to revalidate")
         try:
@@ -269,3 +273,21 @@ class UserHandler:
                 mail.body.attachments if len(mail.body.attachments) > 0 else None,
             )
         )
+
+    def make_user_based_revalidation_delta(self):
+        """
+        Для каждого пользователя интервал ревалидации свой,
+        чтобы размазать нагрузку по ревалидации во времени.
+        Для каждого пользователя дельта для ревалидации составляет от 4.5 до 5 часов.
+        """
+        hash_key = str(self.context.telegram_id) + self.context.samoware_login
+        interval = 30
+        diff = (
+            -interval
+            + int(hashlib.sha256(hash_key.encode("utf-8")).hexdigest(), 16) % interval
+        )
+        revalidation_interval = REVALIDATION_INTERVAL + timedelta(minutes=diff)
+        log.debug(
+            f"setting revalidation shift for user {self.context.telegram_id} for {revalidation_interval}"
+        )
+        return revalidation_interval
