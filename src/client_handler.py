@@ -129,7 +129,9 @@ class UserHandler:
                                 )
                     self.context.polling_context = polling_context
                     if not await self.check_revalidation():
-                        log.warning(f"cannot revalidate user {self.context.samoware_login}")
+                        log.warning(
+                            f"cannot revalidate user {self.context.samoware_login}"
+                        )
                     retry_count = 0
                 except asyncio.CancelledError:
                     return
