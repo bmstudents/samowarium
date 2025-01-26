@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   deploy:
-    name: Deploy to ${{ inputs.environment }} stand \#${{github.run_number}}
+    name: Deploy to ${{ inputs.environment }} stand
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-latest
     steps:
