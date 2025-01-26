@@ -38,10 +38,10 @@ class Encrypter:
         return base64.b64encode(iv + cipher.encrypt(raw))
 
     def decrypt(self, data: bytes) -> str | None:
-        enc = base64.b64decode(data)
-        iv = enc[:16]
-        cipher = AES.new(self.encryption_key, AES.MODE_CBC, iv)
         try:
+            enc = base64.b64decode(data)
+            iv = enc[:16]
+            cipher = AES.new(self.encryption_key, AES.MODE_CBC, iv)
             return unpad(bytes.decode((cipher.decrypt(enc[16:])), encoding="utf-8"))
         except Exception:
             log.exception("can not decrypt data")

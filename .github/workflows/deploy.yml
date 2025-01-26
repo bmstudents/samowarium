@@ -54,7 +54,8 @@ jobs:
             DOCKER_TAG='${{ inputs.tag }}' \
             docker compose \
             -p samowarium-${{ inputs.environment }} \
-            up -d --quiet-pull \
+            up --quiet-pull \
+            -d --wait --wait-timeout 30 \
             --pull always \
             || exit 1
 

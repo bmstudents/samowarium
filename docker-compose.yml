@@ -16,6 +16,12 @@ services:
       - "53000:53000"
     depends_on:
       - postgres
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${HEALTHCHECK_SERVER_PORT}"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   postgres:
     image: postgres:12.22

@@ -63,6 +63,11 @@ def get_postgres_connection_string() -> str:
     )
 
 
+def get_healthcheck_server_port() -> int | None:
+    port = get_var_or_default("HEALTHCHECK_SERVER_PORT", None)
+    return int(port) if port is not None else None
+
+
 def is_ip_check_enabled() -> bool:
     return get_var_or_default("IP_CHECK", None) is not None
 

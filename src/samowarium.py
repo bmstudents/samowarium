@@ -14,6 +14,7 @@ from database import Database
 from encryption import Encrypter
 import env
 import util
+import healthcheck
 
 
 class Application:
@@ -86,13 +87,20 @@ def setup_logger():
 
 async def main() -> None:
     setup_logger()
+
     if env.is_prometheus_metrics_server_enabled():
         port = env.get_prometheus_metrics_server_port()
         logging.info(f"starting the metrics server on {port} port...")
         start_http_server(port)
     logging.info("starting the application...")
+
     app = Application()
     await app.start()
+
+    if (port := env.get_healthcheck_server_port()) is not None:
+        logging.info(f"starting healthcheck server on {port} port...")
+        await healthcheck.setup_healtcheck_server(port)
+
     await asyncio.gather(
         *[task for task in asyncio.all_tasks() if task is not asyncio.current_task()]
     )
