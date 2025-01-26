@@ -129,10 +129,7 @@ class UserHandler:
                                 )
                     self.context.polling_context = polling_context
                     if not await self.check_revalidation():
-                        await self.can_not_revalidate()
-                        await self.db.remove_user(self.context.telegram_id)
-                        forced_logout_metric.inc()
-                        return
+                        log.warning(f"cannot revalidate user {self.context.samoware_login}")
                     retry_count = 0
                 except asyncio.CancelledError:
                     return
