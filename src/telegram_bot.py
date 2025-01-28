@@ -263,7 +263,7 @@ class TelegramBot:
                     await self.send_attachments(telegram_id, attachments)
                 is_sent = True
                 log.info(f"sent message to {telegram_id}")
-            except (telegram.error.Forbidden) as error:
+            except telegram.error.Forbidden as error:
                 log.exception("exception in send_message:\n" + str(error))
                 log.info(f"User {telegram_id} is forbidden. Not retrying")
                 self.db.remove_user(telegram_id)
