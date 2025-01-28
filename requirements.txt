@@ -2,10 +2,11 @@
 python-telegram-bot==21.3
 aiohttp==3.10.11
 beautifulsoup4==4.12.3
+ratelimiter==1.2.0.post0
 
 # env
 python-dotenv==1.0.1
-python-dateutil==2.9.0
+python-dateutil==2.9.0.post0
 
 # migrations
 yoyo-migrations==9.0.0
