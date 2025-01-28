@@ -30,7 +30,7 @@ REVALIDATION_INTERVAL = timedelta(hours=5)
 SESSION_TOKEN_PATTERN = re.compile("^[0-9]{6}-[a-zA-Z0-9]{20}$")
 
 MAX_LOGIN_ATTEMPTS = 3
-LOGIN_PERIOD = timedelta(minutes=1)
+LOGIN_PERIOD = timedelta(minutes=2)
 
 SUCCESSFUL_LOGIN_PROMPT = (
     "Доступ выдан. Все новые письма будут пересылаться в этот чат."
@@ -41,7 +41,9 @@ CAN_NOT_RELOGIN_PROMPT = "Ошибка при автоматической по�
 WRONG_CREDS_PROMPT = "Неверный логин или пароль."
 HANDLER_IS_ALREADY_WORKED_PROMPT = "Доступ уже был выдан."
 HANDLER_IS_ALREADY_SHUTTED_DOWN_PROMPT = "Доступ уже был отозван."
-LOGIN_LIMITED_PROMPT = "Превышено допустимое количество попыток входа. Попробуйте еще раз через {} сек."
+LOGIN_LIMITED_PROMPT = (
+    "Превышено допустимое количество попыток входа. Попробуйте еще раз через {} сек."
+)
 
 
 login_ratelimiters = {}
@@ -49,7 +51,9 @@ login_ratelimiters = {}
 
 def check_ratelimiter(samoware_login: str):
     if samoware_login not in login_ratelimiters:
-        login_ratelimiters[samoware_login] = RateLimiter(MAX_LOGIN_ATTEMPTS, LOGIN_PERIOD)
+        login_ratelimiters[samoware_login] = RateLimiter(
+            MAX_LOGIN_ATTEMPTS, LOGIN_PERIOD
+        )
     login_ratelimiters[samoware_login].check()
 
 
@@ -83,12 +87,18 @@ class UserHandler:
         try:
             check_ratelimiter(samoware_login)
         except RateException as e:
-            await message_sender(telegram_id, LOGIN_LIMITED_PROMPT.format(e.timeout.seconds), MARKDOWN_FORMAT)
+            await message_sender(
+                telegram_id,
+                LOGIN_LIMITED_PROMPT.format(e.timeout.seconds),
+                MARKDOWN_FORMAT,
+            )
             return None
-        
+
         handler = UserHandler(message_sender, db, Context(telegram_id, samoware_login))
         is_successful_login = await handler.login(samoware_password)
-        event_metric.labels(event_name=f"login {"suc" if is_successful_login else "unsuc"}").inc()
+        event_metric.labels(
+            event_name=f"login {"suc" if is_successful_login else "unsuc"}"
+        ).inc()
         if not is_successful_login:
             await message_sender(telegram_id, WRONG_CREDS_PROMPT, MARKDOWN_FORMAT)
             return None
@@ -163,7 +173,9 @@ class UserHandler:
                         event_metric.labels(event_name="forced logout").inc()
                         return
                     is_successful_relogin = await self.login(samoware_password)
-                    event_metric.labels(event_name=f"relogin {"suc" if is_successful_relogin else "unsuc"}").inc()
+                    event_metric.labels(
+                        event_name=f"relogin {"suc" if is_successful_relogin else "unsuc"}"
+                    ).inc()
                     if not is_successful_relogin:
                         await self.can_not_relogin()
                         await self.db.remove_user(self.context.telegram_id)
@@ -225,7 +237,9 @@ class UserHandler:
             timezone.utc,
         ) < datetime.now(timezone.utc):
             is_successful_revalidation = await self.revalidate()
-            event_metric.labels(event_name=f"revalidation {"suc" if is_successful_revalidation else "unsuc"}").inc()
+            event_metric.labels(
+                event_name=f"revalidation {"suc" if is_successful_revalidation else "unsuc"}"
+            ).inc()
             return is_successful_revalidation
         return True
 

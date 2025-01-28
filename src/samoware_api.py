@@ -128,7 +128,11 @@ async def login(login: str, password: str) -> SamowarePollingContext | None:
         tree = ET.fromstring(await response.text())
         if tree.find("session") is None:
             log.debug(f"logging in response ({login}) does not have session tag")
-            if tree.find("response").attrib["errorText"] in ("incorrect password or account name", "failed to route the address", "incorrect E-mail address"):
+            if tree.find("response").attrib["errorText"] in (
+                "incorrect password or account name",
+                "failed to route the address",
+                "incorrect E-mail address",
+            ):
                 raise UnauthorizedError
             else:
                 raise HTTPError(
