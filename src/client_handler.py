@@ -40,7 +40,6 @@ SESSION_EXPIRED_PROMPT = "Сессия доступа к почте истекл
 CAN_NOT_RELOGIN_PROMPT = "Ошибка при автоматической повторной авторизации, невозможно продлить сессию. Для продолжения работы необходима авторизация\n/login _логин_ _пароль_"
 WRONG_CREDS_PROMPT = "Неверный логин или пароль."
 HANDLER_IS_ALREADY_WORKED_PROMPT = "Доступ уже был выдан."
-HANDLER_IS_ALREADY_SHUTTED_DOWN_PROMPT = "Доступ уже был отозван."
 LOGIN_LIMITED_PROMPT = (
     "Превышено допустимое количество попыток входа. Попробуйте еще раз через {} сек."
 )
@@ -49,12 +48,12 @@ LOGIN_LIMITED_PROMPT = (
 login_ratelimiters = {}
 
 
-def check_ratelimiter(samoware_login: str):
-    if samoware_login not in login_ratelimiters:
-        login_ratelimiters[samoware_login] = RateLimiter(
+def check_ratelimiter(telegram_id: int):
+    if telegram_id not in login_ratelimiters:
+        login_ratelimiters[telegram_id] = RateLimiter(
             MAX_LOGIN_ATTEMPTS, LOGIN_PERIOD
         )
-    login_ratelimiters[samoware_login].check()
+    login_ratelimiters[telegram_id].check()
 
 
 class UserHandler:
@@ -85,7 +84,7 @@ class UserHandler:
             return None
 
         try:
-            check_ratelimiter(samoware_login)
+            check_ratelimiter(telegram_id)
         except RateException as e:
             await message_sender(
                 telegram_id,

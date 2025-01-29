@@ -56,6 +56,7 @@ AUTOREAD_PROMPT = (
 )
 AUTOREAD_ON_PROMPT = "Письма будут отмечаться прочитанными автоматически."
 AUTOREAD_OFF_PROMPT = "Письма не будут отмечаться прочитанными."
+HANDLER_IS_ALREADY_SHUTTED_DOWN_PROMPT = "Доступ уже был отозван."
 
 MAX_TELEGRAM_MESSAGE_LENGTH = 4096
 
@@ -147,26 +148,30 @@ class TelegramBot:
     async def start_command(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
-        log.debug(f"received /start from {update.effective_user.id}")
+        log.info(f"received /start from {update.effective_user.id}")
         metrics.incoming_commands_metric.labels(command_name="start").inc()
         await update.message.reply_markdown(START_PROMPT)
 
     async def stop_command(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
-        log.debug(f"received /stop from {update.effective_user.id}")
+        log.info(f"received /stop from {update.effective_user.id}")
         telegram_id = update.effective_user.id
+        metrics.incoming_commands_metric.labels(command_name="stop").inc()
+        if telegram_id not in self.handlers:
+            await update.message.reply_markdown(HANDLER_IS_ALREADY_SHUTTED_DOWN_PROMPT)
+            return
+
         await self.handlers[telegram_id].stop_handling()
         await self.db.remove_user(
             telegram_id
         )  # TODO: не удалять запись, а удалять только контекст и пароль
-        metrics.incoming_commands_metric.labels(command_name="stop").inc()
         await update.message.reply_markdown(STOP_PROMPT)
 
     async def login_command(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
-        log.debug(f"received /login from {update.effective_user.id}")
+        log.info(f"received /login from {update.effective_user.id}")
         metrics.incoming_commands_metric.labels(command_name="login").inc()
         if context.args is None or len(context.args) != 2:
             log.debug(
@@ -267,9 +272,24 @@ class TelegramBot:
                 log.exception("exception in send_message:\n" + str(error))
                 log.info(f"User {telegram_id} is forbidden. Not retrying")
                 self.db.remove_user(telegram_id)
+                metrics.event_metric.labels(event_name="message for forbidden user").inc()
                 break
+            except telegram.error.BadRequest as error:
+                log.warning(f"unsupported mail format for user {telegram_id}: {str(error)}")
+                metrics.event_metric.labels(event_name="unsupported email message").inc()
+                try:
+                    message_header = "\n".join(message.split("\n")[0:8] + \
+                                               ["<i>Отображение письма не поддерживается. Для просмотра используйте <a href=\"https://student.bmstu.ru/\">почтовый клиент</a>.</i>"])
+                    await self.application.bot.send_message(
+                        telegram_id, message_header, parse_mode=format
+                    )
+                except Exception as error:
+                    metrics.event_metric.labels(event_name="fail on unsupported mail").inc()
+                    log.exception(f"cannot send message due bad request to user {telegram_id}")
+                is_sent = True
             except Exception as error:
                 log.exception("exception in send_message:\n" + str(error))
+                metrics.event_metric.labels(event_name="fail on send").inc()
                 log.info(
                     f"retrying to send message for {telegram_id} in {TELEGRAM_SEND_RETRY_DELAY_SEC} seconds..."
                 )
