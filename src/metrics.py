@@ -19,16 +19,7 @@ samoware_response_status_code_metric = Counter(
 )
 
 # Domain
-login_metric = Counter("login", "Login events metric", labelnames=["is_successful"])
-relogin_metric = Counter(
-    "relogin", "Relogin events metric", labelnames=["is_successful"]
-)
-revalidation_metric = Counter(
-    "revalidation", "Revalidation events metric", labelnames=["is_successful"]
-)
-logout_metric = Counter("logout", "Logout events metric")
-forced_logout_metric = Counter("forced_logout", "Forced logout events metric")
+event_metric = Counter("event", "Events in the system", labelnames=["event_name"])
 user_handler_error_metric = Counter(
     "user_handler_error", "Client handler error events metric", labelnames=["type"]
 )
-incoming_letter_metric = Counter("incoming_letter", "Incoming letter events metric")
