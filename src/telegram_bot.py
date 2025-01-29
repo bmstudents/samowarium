@@ -5,10 +5,11 @@ import logging as log
 from typing import Optional
 import asyncio
 from client_handler import UserHandler
-from const import MARKDOWN_FORMAT, TELEGRAM_SEND_RETRY_DELAY_SEC
+from const import MARKDOWN_FORMAT, MARKDOWN_FORMAT_V2, TELEGRAM_SEND_RETRY_DELAY_SEC
 from database import Database
 import env
 import metrics
+import re
 
 START_PROMPT = "Выдать доступ боту до почты :\n/login _логин_ _пароль_\n\nОтозвать доступ:\n/stop\n\nFAQ:\n/about"
 STOP_PROMPT = "Доступ отозван. Логин и сессия были удалены."
@@ -43,8 +44,9 @@ Samowarium - бот, который пересылает входящие пис
 Версия: `{}-{}`
 """
 LOGIN_WRONG_FORMAT_PROMPT = (
-    "Неверный формат использования команды:\n/login <i>логин</i> <i>пароль</i>"
+    "Неверный формат использования команды:\n/login _логин_ _пароль_"
 )
+HANDLER_IS_ALREADY_SHUTTED_DOWN_PROMPT = "Доступ уже был отозван."
 WAIT_TO_AUTH_PROMPT = "Авторизация. Пожалуйста, подождите..."
 SAVE_PASSWORD_PROMPT = (
     "Сохранить пароль? Подробнее о хранении и использовании паролей: /about"
@@ -147,32 +149,35 @@ class TelegramBot:
     async def start_command(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
-        log.debug(f"received /start from {update.effective_user.id}")
+        log.info(f"received /start from {update.effective_user.id}")
         metrics.incoming_commands_metric.labels(command_name="start").inc()
         await update.message.reply_markdown(START_PROMPT)
 
     async def stop_command(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
-        log.debug(f"received /stop from {update.effective_user.id}")
+        log.info(f"received /stop from {update.effective_user.id}")
         telegram_id = update.effective_user.id
-        await self.handlers[telegram_id].stop_handling()
-        await self.db.remove_user(
-            telegram_id
-        )  # TODO: не удалять запись, а удалять только контекст и пароль
-        metrics.incoming_commands_metric.labels(command_name="stop").inc()
-        await update.message.reply_markdown(STOP_PROMPT)
+        if telegram_id in self.handlers:
+            await self.handlers[telegram_id].stop_handling()
+            await self.db.remove_user(
+                telegram_id
+            )  # TODO: не удалять запись, а удалять только контекст и пароль
+            metrics.incoming_commands_metric.labels(command_name="stop").inc()
+            await update.message.reply_markdown(STOP_PROMPT)
+        else:
+            await update.message.reply_markdown(HANDLER_IS_ALREADY_SHUTTED_DOWN_PROMPT)
 
     async def login_command(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
     ) -> None:
-        log.debug(f"received /login from {update.effective_user.id}")
+        log.info(f"received /login from {update.effective_user.id}")
         metrics.incoming_commands_metric.labels(command_name="login").inc()
         if context.args is None or len(context.args) != 2:
-            log.debug(
+            log.info(
                 f"user {update.effective_user.id} entered login and password in wrong format"
             )
-            await update.message.reply_html(LOGIN_WRONG_FORMAT_PROMPT)
+            await update.message.reply_markdown(LOGIN_WRONG_FORMAT_PROMPT)
             return
         wait_message = await update.message.reply_markdown(WAIT_TO_AUTH_PROMPT)
         telegram_id = update.effective_user.id
@@ -247,6 +252,11 @@ class TelegramBot:
         format: str | None = None,
         attachments: Optional[list[tuple[bytes, str]]] = None,
     ) -> None:
+        if format == MARKDOWN_FORMAT_V2:
+            message = re.sub(r'[_*[\]()~>#\+\-=|{}.!]', lambda x: '\\' + x.group(), message)
+            log.info(f"jopa {message}")
+            message = re.sub(r'\\\\[_*[\]()~>#\+\-=|{}.!]', lambda x: x.group()[2:], message)
+        log.info(f"jopa {message}")
         is_sent = False
         log.debug(f"sending a message to {telegram_id} ...")
         metrics.sent_message_metric.inc()
@@ -267,9 +277,24 @@ class TelegramBot:
                 log.exception("exception in send_message:\n" + str(error))
                 log.info(f"User {telegram_id} is forbidden. Not retrying")
                 self.db.remove_user(telegram_id)
+                metrics.event_metric.labels(event_name="message for forbidden user").inc()
                 break
+            except telegram.error.BadRequest as error:
+                log.warning(f"unsupported mail format for user {telegram_id}: {str(error)}")
+                metrics.event_metric.labels(event_name="unsupported email message").inc()
+                try:
+                    message_header = "\n".join(message.split("\n")[0:6] + \
+                                               ["\n_Отображение не поддерживается. Для просмотра письма используйте [почтовый клиент](https://student.bmstu.ru/)._"])
+                    await self.application.bot.send_message(
+                        telegram_id, message_header, parse_mode=format
+                    )
+                except Exception as error:
+                    metrics.event_metric.labels(event_name="fail on unsupported mail").inc()
+                    log.exception(f"cannot send message due bad request to user {telegram_id}")
+                is_sent = True
             except Exception as error:
                 log.exception("exception in send_message:\n" + str(error))
+                metrics.event_metric.labels(event_name="fail on send").inc()
                 log.info(
                     f"retrying to send message for {telegram_id} in {TELEGRAM_SEND_RETRY_DELAY_SEC} seconds..."
                 )
@@ -295,6 +320,7 @@ class TelegramBot:
                     write_timeout=HTTP_FILE_SEND_TIMEOUT_SEC,
                 )
                 sent = True
+                metrics.event_metric.labels(event_name="send attachment").inc()
                 log.info(f"sent attachments to {telegram_id}")
             except telegram.error.BadRequest as error:
                 log.exception("exception in send_attachments:\n" + str(error))

@@ -7,8 +7,8 @@ HTTP_RETRY_DELAY_SEC = 10
 TELEGRAM_SEND_RETRY_DELAY_SEC = 2
 
 # tg message formats
-HTML_FORMAT = "html"
-MARKDOWN_FORMAT = "markdown"
+MARKDOWN_FORMAT = "Markdown"
+MARKDOWN_FORMAT_V2 = "MarkdownV2"
 
 # logs
 LOGGER_FOLDER_PATH = "logs"

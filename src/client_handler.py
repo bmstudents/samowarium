@@ -10,8 +10,8 @@ from context import Context
 from infra.ratelimiter import RateLimiter, RateException
 
 from const import (
-    HTML_FORMAT,
     HTTP_RETRY_DELAY_SEC,
+    MARKDOWN_FORMAT_V2,
     MARKDOWN_FORMAT,
 )
 from database import Database
@@ -36,11 +36,10 @@ SUCCESSFUL_LOGIN_PROMPT = (
     "Доступ выдан. Все новые письма будут пересылаться в этот чат."
 )
 CAN_NOT_REVALIDATE_PROMPT = "Невозможно продлить сессию из-за внутренней ошибки. Для продолжения работы необходима повторная авторизация\n/login _логин_ _пароль_"
-SESSION_EXPIRED_PROMPT = "Сессия доступа к почте истекла. Для продолжения работы необходима повторная авторизация\n/login _логин_ _пароль_"
+SESSION_EXPIRED_PROMPT = "Из-за недоступности почтового сервера сессия доступа к почте истекла. Для продолжения работы необходима повторная авторизация\n/login _логин_ _пароль_"
 CAN_NOT_RELOGIN_PROMPT = "Ошибка при автоматической повторной авторизации, невозможно продлить сессию. Для продолжения работы необходима авторизация\n/login _логин_ _пароль_"
 WRONG_CREDS_PROMPT = "Неверный логин или пароль."
 HANDLER_IS_ALREADY_WORKED_PROMPT = "Доступ уже был выдан."
-HANDLER_IS_ALREADY_SHUTTED_DOWN_PROMPT = "Доступ уже был отозван."
 LOGIN_LIMITED_PROMPT = (
     "Превышено допустимое количество попыток входа. Попробуйте еще раз через {} сек."
 )
@@ -49,12 +48,12 @@ LOGIN_LIMITED_PROMPT = (
 login_ratelimiters = {}
 
 
-def check_ratelimiter(samoware_login: str):
-    if samoware_login not in login_ratelimiters:
-        login_ratelimiters[samoware_login] = RateLimiter(
+def check_ratelimiter(telegram_id: int):
+    if telegram_id not in login_ratelimiters:
+        login_ratelimiters[telegram_id] = RateLimiter(
             MAX_LOGIN_ATTEMPTS, LOGIN_PERIOD
         )
-    login_ratelimiters[samoware_login].check()
+    login_ratelimiters[telegram_id].check()
 
 
 class UserHandler:
@@ -85,7 +84,7 @@ class UserHandler:
             return None
 
         try:
-            check_ratelimiter(samoware_login)
+            check_ratelimiter(telegram_id)
         except RateException as e:
             await message_sender(
                 telegram_id,
@@ -286,19 +285,19 @@ class UserHandler:
         )
 
     async def forward_mail(self, mail: Mail):
-        from_str = f'<a href="copy-this-mail.example/{mail.header.from_mail}">{mail.header.from_name}</a>'
+        from_str = f"\\[{mail.header.from_name}\\]\\(copy-this-mail.example/{mail.header.from_mail}\\)"
         to_str = ", ".join(
-            f'<a href="copy-this-mail.example/{recipient[0]}">{recipient[1]}</a>'
+            f"\\[{recipient[1]}\\]\\(copy-this-mail.example/{recipient[0]}\\)"
             for recipient in mail.header.recipients
         )
 
-        mail_text = f'{datetime.strftime(mail.header.local_time, "%d.%m.%Y %H:%M")}\n\nОт кого: {from_str}\n\nКому: {to_str}\n\n<b>{mail.header.subject}</b>\n\n{mail.body.text}'
+        mail_text = f'{datetime.strftime(mail.header.local_time, "%d.%m.%Y %H:%M")}\n\nОт кого: {from_str}\n\nКому: {to_str}\n\n\\*{mail.header.subject}\\*\n\n{mail.body.text}'
 
         asyncio.create_task(
             self.message_sender(
                 self.context.telegram_id,
                 mail_text,
-                HTML_FORMAT,
+                MARKDOWN_FORMAT_V2,
                 mail.body.attachments if len(mail.body.attachments) > 0 else None,
             )
         )

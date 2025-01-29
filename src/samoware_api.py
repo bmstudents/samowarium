@@ -419,7 +419,7 @@ async def get_mail_body_by_id(context: SamowarePollingContext, uid: str) -> Mail
 
         text = ""
         for mailBodyHtml in mailBodiesHtml:
-            log.debug("mail body: " + str(mailBodyHtml.encode()))
+            log.info("mail body: " + str(mailBodyHtml))
             foundTextBeg = False
             for element in mailBodyHtml.children:
                 if (
@@ -506,15 +506,16 @@ def html_element_to_text(element):
     elif isinstance(element, bs.Tag):
         if element.name == "a" and "href" in element.attrs:
             href = element["href"]
-            text = f'<a href="{href}">'
-            for child in element.children:
-                text += html_element_to_text(child)
-            text += "</a>"
+            text = f"\\[{"".join(html_element_to_text(x) for x in element.children)}\\]\\({href}\\)"
             return text
         elif element.name == "style":
             return ""
         elif element.name == "br":
             return "\n"
+        elif element.name == "strong" or element.name == "b":
+            return "\\*"
+        elif element.name == "&quot;":
+            return "\""
         elif element.name == "hr":
             return "\n----------\n"
         elif element.name == "p":
@@ -536,13 +537,12 @@ def html_element_to_text(element):
             text = ""
             for child in element.children:
                 text += html_element_to_text(child)
-            return "<blockquote>" + text.strip() + "</blockquote>"
+            return "```" + text.strip() + "```"
         else:
             text = ""
             for child in element.children:
                 text += html_element_to_text(child)
             return text
-
 
 def has_updates(response: str) -> bool:
     return '<folderReport folder="INBOX-MM-1" mode="notify"/>' in response
