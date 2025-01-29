@@ -299,7 +299,7 @@ class TelegramBot:
                         event_name="fail on unsupported mail"
                     ).inc()
                     log.exception(
-                        f"cannot send message due bad request to user {telegram_id}"
+                        f"cannot send message due bad request to user {telegram_id}:\n{error}"
                     )
                 is_sent = True
             except Exception as error:
