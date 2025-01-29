@@ -50,9 +50,7 @@ login_ratelimiters = {}
 
 def check_ratelimiter(telegram_id: int):
     if telegram_id not in login_ratelimiters:
-        login_ratelimiters[telegram_id] = RateLimiter(
-            MAX_LOGIN_ATTEMPTS, LOGIN_PERIOD
-        )
+        login_ratelimiters[telegram_id] = RateLimiter(MAX_LOGIN_ATTEMPTS, LOGIN_PERIOD)
     login_ratelimiters[telegram_id].check()
 
 

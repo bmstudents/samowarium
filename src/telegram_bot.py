@@ -163,6 +163,7 @@ class TelegramBot:
             return
 
         await self.handlers[telegram_id].stop_handling()
+        self.handlers.pop(telegram_id)
         await self.db.remove_user(
             telegram_id
         )  # TODO: не удалять запись, а удалять только контекст и пароль
@@ -272,20 +273,34 @@ class TelegramBot:
                 log.exception("exception in send_message:\n" + str(error))
                 log.info(f"User {telegram_id} is forbidden. Not retrying")
                 self.db.remove_user(telegram_id)
-                metrics.event_metric.labels(event_name="message for forbidden user").inc()
+                metrics.event_metric.labels(
+                    event_name="message for forbidden user"
+                ).inc()
                 break
             except telegram.error.BadRequest as error:
-                log.warning(f"unsupported mail format for user {telegram_id}: {str(error)}")
-                metrics.event_metric.labels(event_name="unsupported email message").inc()
+                log.warning(
+                    f"unsupported mail format for user {telegram_id}: {str(error)}"
+                )
+                metrics.event_metric.labels(
+                    event_name="unsupported email message"
+                ).inc()
                 try:
-                    message_header = "\n".join(message.split("\n")[0:8] + \
-                                               ["<i>Отображение письма не поддерживается. Для просмотра используйте <a href=\"https://student.bmstu.ru/\">почтовый клиент</a>.</i>"])
+                    message_header = "\n".join(
+                        message.split("\n")[0:8]
+                        + [
+                            '<i>Отображение письма не поддерживается. Для просмотра используйте <a href="https://student.bmstu.ru/">почтовый клиент</a>.</i>'
+                        ]
+                    )
                     await self.application.bot.send_message(
                         telegram_id, message_header, parse_mode=format
                     )
                 except Exception as error:
-                    metrics.event_metric.labels(event_name="fail on unsupported mail").inc()
-                    log.exception(f"cannot send message due bad request to user {telegram_id}")
+                    metrics.event_metric.labels(
+                        event_name="fail on unsupported mail"
+                    ).inc()
+                    log.exception(
+                        f"cannot send message due bad request to user {telegram_id}"
+                    )
                 is_sent = True
             except Exception as error:
                 log.exception("exception in send_message:\n" + str(error))
