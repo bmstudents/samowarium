@@ -19,6 +19,7 @@ import samoware_api
 from samoware_api import (
     Mail,
     UnauthorizedError,
+    ChangePasswordError
 )
 from util import MessageSender
 from metrics import (
@@ -39,10 +40,18 @@ CAN_NOT_REVALIDATE_PROMPT = "Невозможно продлить сессию 
 SESSION_EXPIRED_PROMPT = "Сессия доступа к почте истекла. Для продолжения работы необходима повторная авторизация\n/login _логин_ _пароль_"
 CAN_NOT_RELOGIN_PROMPT = "Ошибка при автоматической повторной авторизации, невозможно продлить сессию. Для продолжения работы необходима авторизация\n/login _логин_ _пароль_"
 WRONG_CREDS_PROMPT = "Неверный логин или пароль."
+CHANGE_PASSWORD_PROMPT = "Необходимо сменить пароль от Бауманской почты: https://student.bmstu.ru/"
+UNKNOWN_LOGIN_ERROR_PROMPT = "Неизвестная ошибка авторизации"
 HANDLER_IS_ALREADY_WORKED_PROMPT = "Доступ уже был выдан."
 LOGIN_LIMITED_PROMPT = (
     "Превышено допустимое количество попыток входа. Попробуйте еще раз через {} сек."
 )
+
+class LoginResult:
+    OK = 0
+    UNAUTHORIZED = 1
+    CHANGE_PASSWORD = 2
+    UNKNOWN_ERROR = 3
 
 
 login_ratelimiters = {}
@@ -92,12 +101,18 @@ class UserHandler:
             return None
 
         handler = UserHandler(message_sender, db, Context(telegram_id, samoware_login))
-        is_successful_login = await handler.login(samoware_password)
+        login_result = await handler.login(samoware_password)
         event_metric.labels(
-            event_name=f"login {"suc" if is_successful_login else "unsuc"}"
+            event_name=f"login {"suc" if (login_result == LoginResult.OK) else "unsuc"}"
         ).inc()
-        if not is_successful_login:
+        if login_result == LoginResult.UNAUTHORIZED:
             await message_sender(telegram_id, WRONG_CREDS_PROMPT, MARKDOWN_FORMAT)
+            return None
+        elif login_result == LoginResult.CHANGE_PASSWORD:
+            await message_sender(telegram_id, CHANGE_PASSWORD_PROMPT, MARKDOWN_FORMAT)
+            return None
+        elif login_result != LoginResult.OK:
+            await message_sender(telegram_id, UNKNOWN_LOGIN_ERROR_PROMPT, MARKDOWN_FORMAT)
             return None
         await db.add_user(telegram_id, handler.context)
         await message_sender(telegram_id, SUCCESSFUL_LOGIN_PROMPT, MARKDOWN_FORMAT)
@@ -169,11 +184,11 @@ class UserHandler:
                         await self.db.remove_user(self.context.telegram_id)
                         event_metric.labels(event_name="forced logout").inc()
                         return
-                    is_successful_relogin = await self.login(samoware_password)
+                    relogin_result = await self.login(samoware_password)
                     event_metric.labels(
-                        event_name=f"relogin {"suc" if is_successful_relogin else "unsuc"}"
+                        event_name=f"relogin {"suc" if (relogin_result == LoginResult.OK) else "unsuc"}"
                     ).inc()
-                    if not is_successful_relogin:
+                    if relogin_result != LoginResult.OK:
                         await self.can_not_relogin()
                         await self.db.remove_user(self.context.telegram_id)
                         event_metric.labels(event_name="forced logout").inc()
@@ -198,7 +213,7 @@ class UserHandler:
         finally:
             log.info(f"longpolling for {self.context.samoware_login} stopped")
 
-    async def login(self, samoware_password: str) -> bool:
+    async def login(self, samoware_password: str) -> LoginResult:
         log.debug("trying to login")
         retry_count = 0
         while True:
@@ -212,14 +227,18 @@ class UserHandler:
                 self.context.last_revalidation = datetime.now(timezone.utc)
                 await self.db.set_handler_context(self.context)
                 log.info(f"successful login for user {self.context.samoware_login}")
-                return True
+                return LoginResult.OK
             except UnauthorizedError as error:
                 log.info(f"unsuccessful login for user {self.context.samoware_login}")
                 user_handler_error_metric.labels(type=type(error).__name__).inc()
-                return False
+                return LoginResult.UNAUTHORIZED
+            except ChangePasswordError as error:
+                log.info(f"user {self.context.samoware_login} needs to change password")
+                user_handler_error_metric.labels(type=type(error).__name__).inc()
+                return LoginResult.CHANGE_PASSWORD
             except asyncio.CancelledError:
                 log.info("login cancelled")
-                return False
+                return LoginResult.UNKNOWN_ERROR
             except Exception as error:
                 log.exception(
                     f"retry_count={retry_count}. exception on login. retrying in {HTTP_RETRY_DELAY_SEC}..."
@@ -233,14 +252,14 @@ class UserHandler:
             self.context.last_revalidation + self.revalidation_delta,
             timezone.utc,
         ) < datetime.now(timezone.utc):
-            is_successful_revalidation = await self.revalidate()
+            revalidation_result = await self.revalidate()
             event_metric.labels(
-                event_name=f"revalidation {"suc" if is_successful_revalidation else "unsuc"}"
+                event_name=f"revalidation {"suc" if (revalidation_result == LoginResult.OK) else "unsuc"}"
             ).inc()
-            return is_successful_revalidation
+            return revalidation_result == LoginResult.OK
         return True
 
-    async def revalidate(self) -> bool:
+    async def revalidate(self) -> LoginResult:
         log.debug("trying to revalidate")
         try:
             polling_context = await samoware_api.revalidate(
@@ -257,11 +276,15 @@ class UserHandler:
             self.context.last_revalidation = datetime.now(timezone.utc)
             await self.db.set_handler_context(self.context)
             log.info(f"successful revalidation for user {self.context.samoware_login}")
-            return True
+            return LoginResult.OK
         except UnauthorizedError as error:
             log.exception("UnauthorizedError on revalidation")
             user_handler_error_metric.labels(type=type(error).__name__).inc()
-            return False
+            return LoginResult.UNAUTHORIZED
+        except ChangePasswordError as error:
+            log.info(f"user {self.context.samoware_login} needs to change password")
+            user_handler_error_metric.labels(type=type(error).__name__).inc()
+            return LoginResult.CHANGE_PASSWORD
 
     async def can_not_revalidate(self):
         await self.message_sender(

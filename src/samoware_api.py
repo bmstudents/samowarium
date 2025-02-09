@@ -29,6 +29,8 @@ AGGRESSIVE_FORMAT_LETTER = True
 class UnauthorizedError(Exception):
     pass
 
+class ChangePasswordError(Exception):
+    pass
 
 class SamowarePollingContext:
     def __init__(
@@ -126,6 +128,7 @@ async def login(login: str, password: str) -> SamowarePollingContext | None:
         metrics.samoware_response_status_code_metric.labels(sc=response.status).inc()
 
         tree = ET.fromstring(await response.text())
+        print(await response.text())
         if tree.find("session") is None:
             log.debug(f"logging in response ({login}) does not have session tag")
             if tree.find("response").attrib["errorText"] in (
@@ -142,6 +145,9 @@ async def login(login: str, password: str) -> SamowarePollingContext | None:
                     hdrs=None,
                     fp=None,
                 )
+
+        if "changePassword" in tree.find("session").attrib:
+            raise ChangePasswordError
 
         session = tree.find("session").attrib["urlID"]
 
