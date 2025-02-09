@@ -148,7 +148,7 @@ async def login(login: str, password: str) -> SamowarePollingContext | None:
                     fp=None,
                 )
 
-        if "changePassword" in tree.find("session").attrib:
+        if "changePassword" in tree.find("session").attrib and tree.find("session").attrib["changePassword"] == "1":
             raise ChangePasswordError
 
         session = tree.find("session").attrib["urlID"]
