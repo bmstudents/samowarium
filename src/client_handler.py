@@ -16,11 +16,7 @@ from const import (
 )
 from database import Database
 import samoware_api
-from samoware_api import (
-    Mail,
-    UnauthorizedError,
-    ChangePasswordError
-)
+from samoware_api import Mail, UnauthorizedError, ChangePasswordError
 from util import MessageSender
 from metrics import (
     event_metric,
@@ -40,12 +36,15 @@ CAN_NOT_REVALIDATE_PROMPT = "Невозможно продлить сессию 
 SESSION_EXPIRED_PROMPT = "Сессия доступа к почте истекла. Для продолжения работы необходима повторная авторизация\n/login _логин_ _пароль_"
 CAN_NOT_RELOGIN_PROMPT = "Ошибка при автоматической повторной авторизации, невозможно продлить сессию. Для продолжения работы необходима авторизация\n/login _логин_ _пароль_"
 WRONG_CREDS_PROMPT = "Неверный логин или пароль."
-CHANGE_PASSWORD_PROMPT = "Необходимо сменить пароль от Бауманской почты: https://student.bmstu.ru/"
+CHANGE_PASSWORD_PROMPT = (
+    "Необходимо сменить пароль от Бауманской почты: https://student.bmstu.ru/"
+)
 UNKNOWN_LOGIN_ERROR_PROMPT = "Неизвестная ошибка авторизации"
 HANDLER_IS_ALREADY_WORKED_PROMPT = "Доступ уже был выдан."
 LOGIN_LIMITED_PROMPT = (
     "Превышено допустимое количество попыток входа. Попробуйте еще раз через {} сек."
 )
+
 
 class LoginResult:
     OK = 0
@@ -112,7 +111,9 @@ class UserHandler:
             await message_sender(telegram_id, CHANGE_PASSWORD_PROMPT, MARKDOWN_FORMAT)
             return None
         elif login_result != LoginResult.OK:
-            await message_sender(telegram_id, UNKNOWN_LOGIN_ERROR_PROMPT, MARKDOWN_FORMAT)
+            await message_sender(
+                telegram_id, UNKNOWN_LOGIN_ERROR_PROMPT, MARKDOWN_FORMAT
+            )
             return None
         await db.add_user(telegram_id, handler.context)
         await message_sender(telegram_id, SUCCESSFUL_LOGIN_PROMPT, MARKDOWN_FORMAT)

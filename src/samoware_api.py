@@ -29,8 +29,10 @@ AGGRESSIVE_FORMAT_LETTER = True
 class UnauthorizedError(Exception):
     pass
 
+
 class ChangePasswordError(Exception):
     pass
+
 
 class SamowarePollingContext:
     def __init__(
