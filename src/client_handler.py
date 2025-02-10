@@ -167,10 +167,16 @@ class UserHandler:
                                     polling_context, mail_header.uid
                                 )
                     self.context.polling_context = polling_context
-                    if not await self.check_revalidation():
+                    revalidation_result = await self.check_revalidation()
+                    if revalidation_result != LoginResult.OK:
                         log.warning(
                             f"cannot revalidate user {self.context.samoware_login}"
                         )
+                        if revalidation_result == LoginResult.CHANGE_PASSWORD:
+                            await self.can_not_relogin()
+                            await self.db.remove_user(self.context.telegram_id)
+                            event_metric.labels(event_name="forced logout").inc()
+                            return
                     retry_count = 0
                 except asyncio.CancelledError:
                     return
@@ -248,17 +254,18 @@ class UserHandler:
                 retry_count += 1
                 await asyncio.sleep(HTTP_RETRY_DELAY_SEC)
 
-    async def check_revalidation(self) -> bool:
-        if datetime.astimezone(
-            self.context.last_revalidation + self.revalidation_delta,
-            timezone.utc,
-        ) < datetime.now(timezone.utc):
+    async def check_revalidation(self) -> LoginResult:
+        # if datetime.astimezone(
+        #     self.context.last_revalidation + self.revalidation_delta,
+        #     timezone.utc,
+        # ) < datetime.now(timezone.utc):
+        if True:
             revalidation_result = await self.revalidate()
             event_metric.labels(
                 event_name=f"revalidation {"suc" if (revalidation_result == LoginResult.OK) else "unsuc"}"
             ).inc()
-            return revalidation_result == LoginResult.OK
-        return True
+            return revalidation_result
+        return LoginResult.OK
 
     async def revalidate(self) -> LoginResult:
         log.debug("trying to revalidate")

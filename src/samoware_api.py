@@ -130,7 +130,6 @@ async def login(login: str, password: str) -> SamowarePollingContext | None:
         metrics.samoware_response_status_code_metric.labels(sc=response.status).inc()
 
         tree = ET.fromstring(await response.text())
-        print(await response.text())
         if tree.find("session") is None:
             log.debug(f"logging in response ({login}) does not have session tag")
             if tree.find("response").attrib["errorText"] in (
@@ -148,8 +147,8 @@ async def login(login: str, password: str) -> SamowarePollingContext | None:
                     fp=None,
                 )
 
-        if "changePassword" in tree.find("session").attrib and tree.find("session").attrib["changePassword"] == "1":
-            raise ChangePasswordError
+        # if "changePassword" in tree.find("session").attrib and tree.find("session").attrib["changePassword"] == "1":
+        #     raise ChangePasswordError
 
         session = tree.find("session").attrib["urlID"]
 
