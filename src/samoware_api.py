@@ -30,6 +30,10 @@ class UnauthorizedError(Exception):
     pass
 
 
+class ChangePasswordError(Exception):
+    pass
+
+
 class SamowarePollingContext:
     def __init__(
         self,
@@ -143,6 +147,12 @@ async def login(login: str, password: str) -> SamowarePollingContext | None:
                     fp=None,
                 )
 
+        if (
+            "changePassword" in tree.find("session").attrib
+            and tree.find("session").attrib["changePassword"] == "1"
+        ):
+            raise ChangePasswordError
+
         session = tree.find("session").attrib["urlID"]
 
         log.debug(f"successful login for {login}")
@@ -183,6 +193,12 @@ async def revalidate(login: str, session: str) -> SamowarePollingContext | None:
                 raise HTTPError(
                     url=url, code=response.status, msg=(await response.text())
                 )
+
+        if (
+            "changePassword" in tree.find("session").attrib
+            and tree.find("session").attrib["changePassword"] == "1"
+        ):
+            raise ChangePasswordError
 
         new_session = tree.find("session").attrib["urlID"]
         log.debug(f"successful revalidation {login}")
