@@ -101,9 +101,7 @@ class UserHandler:
 
         handler = UserHandler(message_sender, db, Context(telegram_id, samoware_login))
         login_result = await handler.login(samoware_password)
-        event_metric.labels(
-            event_name=f"login {login_result}"
-        ).inc()
+        event_metric.labels(event_name=f"login {login_result}").inc()
         if login_result == AuthResult.UNAUTHORIZED:
             await message_sender(telegram_id, WRONG_CREDS_PROMPT, MARKDOWN_FORMAT)
             return None
@@ -192,9 +190,7 @@ class UserHandler:
                         event_metric.labels(event_name="forced logout").inc()
                         return
                     relogin_result = await self.login(samoware_password)
-                    event_metric.labels(
-                        event_name=f"relogin {relogin_result}"
-                    ).inc()
+                    event_metric.labels(event_name=f"relogin {relogin_result}").inc()
                     if relogin_result != AuthResult.OK:
                         await self.can_not_relogin()
                         await self.db.remove_user(self.context.telegram_id)
@@ -260,9 +256,7 @@ class UserHandler:
             timezone.utc,
         ) < datetime.now(timezone.utc):
             revalidation_result = await self.revalidate()
-            event_metric.labels(
-                event_name=f"revalidation {revalidation_result}"
-            ).inc()
+            event_metric.labels(event_name=f"revalidation {revalidation_result}").inc()
             return revalidation_result
         return AuthResult.OK
 
