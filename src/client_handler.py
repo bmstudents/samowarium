@@ -308,7 +308,9 @@ class UserHandler:
 
     async def can_not_relogin_change_password(self):
         await self.message_sender(
-            self.context.telegram_id, CAN_NOT_RELOGIN_CHANGE_PASSWORD_PROMPT, MARKDOWN_FORMAT
+            self.context.telegram_id,
+            CAN_NOT_RELOGIN_CHANGE_PASSWORD_PROMPT,
+            MARKDOWN_FORMAT,
         )
 
     async def session_has_expired(self):
