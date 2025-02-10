@@ -191,6 +191,9 @@ async def revalidate(login: str, session: str) -> SamowarePollingContext | None:
                 raise HTTPError(
                     url=url, code=response.status, msg=(await response.text())
                 )
+            
+        if "changePassword" in tree.find("session").attrib and tree.find("session").attrib["changePassword"] == "1":
+            raise ChangePasswordError
 
         new_session = tree.find("session").attrib["urlID"]
         log.debug(f"successful revalidation {login}")
