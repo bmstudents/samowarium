@@ -75,7 +75,7 @@ def setup_logger():
         level=LOGGER_LEVEL,
     )
     logging.getLogger("httpx").setLevel(logging.WARN)
-    logging.getLogger('aiohttp.access').setLevel(logging.WARNING)
+    logging.getLogger("aiohttp.access").setLevel(logging.WARNING)
     if env.is_prod_profile():
         logging.getLogger("telegram.ext.Updater").setLevel(logging.CRITICAL)
 
