@@ -5,6 +5,7 @@ import re
 from typing import Self
 import hashlib
 import aiohttp
+from enum import Enum
 
 from context import Context
 from infra.ratelimiter import RateLimiter, RateException
@@ -45,7 +46,7 @@ LOGIN_LIMITED_PROMPT = (
 )
 
 
-class AuthResult:
+class AuthResult(Enum):
     OK = 0
     UNAUTHORIZED = 1
     CHANGE_PASSWORD = 2
@@ -101,7 +102,7 @@ class UserHandler:
         handler = UserHandler(message_sender, db, Context(telegram_id, samoware_login))
         login_result = await handler.login(samoware_password)
         event_metric.labels(
-            event_name=f"login {"suc" if (login_result == AuthResult.OK) else "unsuc"}"
+            event_name=f"login {login_result}"
         ).inc()
         if login_result == AuthResult.UNAUTHORIZED:
             await message_sender(telegram_id, WRONG_CREDS_PROMPT, MARKDOWN_FORMAT)
@@ -192,7 +193,7 @@ class UserHandler:
                         return
                     relogin_result = await self.login(samoware_password)
                     event_metric.labels(
-                        event_name=f"relogin {"suc" if (relogin_result == AuthResult.OK) else "unsuc"}"
+                        event_name=f"relogin {relogin_result}"
                     ).inc()
                     if relogin_result != AuthResult.OK:
                         await self.can_not_relogin()
@@ -260,7 +261,7 @@ class UserHandler:
         ) < datetime.now(timezone.utc):
             revalidation_result = await self.revalidate()
             event_metric.labels(
-                event_name=f"revalidation {"suc" if (revalidation_result == AuthResult.OK) else "unsuc"}"
+                event_name=f"revalidation {revalidation_result}"
             ).inc()
             return revalidation_result
         return AuthResult.OK
