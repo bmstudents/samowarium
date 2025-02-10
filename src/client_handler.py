@@ -35,9 +35,10 @@ SUCCESSFUL_LOGIN_PROMPT = (
 CAN_NOT_REVALIDATE_PROMPT = "Невозможно продлить сессию из-за внутренней ошибки. Для продолжения работы необходима повторная авторизация\n/login _логин_ _пароль_"
 SESSION_EXPIRED_PROMPT = "Сессия доступа к почте истекла. Для продолжения работы необходима повторная авторизация\n/login _логин_ _пароль_"
 CAN_NOT_RELOGIN_PROMPT = "Ошибка при автоматической повторной авторизации, невозможно продлить сессию. Для продолжения работы необходима авторизация\n/login _логин_ _пароль_"
+CAN_NOT_RELOGIN_CHANGE_PASSOWRD_PROMPT = "Ошибка при автоматической повторной авторизации, так как сервер Бауманской почты требует смены пароля. Для продолжения работы необходимо сменить пароль на \nhttps://student.bmstu.ru/\n и авторизоваться повторно \n/login _логин_ _пароль_"
 WRONG_CREDS_PROMPT = "Неверный логин или пароль."
 CHANGE_PASSWORD_PROMPT = (
-    "Необходимо сменить пароль от Бауманской почты: https://student.bmstu.ru/"
+    "Сервер Бауманской почты требует сменить пароль: https://student.bmstu.ru/"
 )
 UNKNOWN_LOGIN_ERROR_PROMPT = "Неизвестная ошибка авторизации"
 HANDLER_IS_ALREADY_WORKED_PROMPT = "Доступ уже был выдан."
@@ -173,7 +174,7 @@ class UserHandler:
                             f"cannot revalidate user {self.context.samoware_login}"
                         )
                         if revalidation_result == AuthResult.CHANGE_PASSWORD:
-                            await self.can_not_relogin()
+                            await self.can_not_relogin_change_password()
                             await self.db.remove_user(self.context.telegram_id)
                             event_metric.labels(event_name="forced logout").inc()
                             return
@@ -303,6 +304,11 @@ class UserHandler:
     async def can_not_relogin(self):
         await self.message_sender(
             self.context.telegram_id, CAN_NOT_RELOGIN_PROMPT, MARKDOWN_FORMAT
+        )
+
+    async def can_not_relogin_change_password(self):
+        await self.message_sender(
+            self.context.telegram_id, CAN_NOT_RELOGIN_CHANGE_PASSWORD_PROMPT, MARKDOWN_FORMAT
         )
 
     async def session_has_expired(self):
