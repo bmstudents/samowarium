@@ -255,11 +255,10 @@ class UserHandler:
                 await asyncio.sleep(HTTP_RETRY_DELAY_SEC)
 
     async def check_revalidation(self) -> LoginResult:
-        # if datetime.astimezone(
-        #     self.context.last_revalidation + self.revalidation_delta,
-        #     timezone.utc,
-        # ) < datetime.now(timezone.utc):
-        if True:
+        if datetime.astimezone(
+            self.context.last_revalidation + self.revalidation_delta,
+            timezone.utc,
+        ) < datetime.now(timezone.utc):
             revalidation_result = await self.revalidate()
             event_metric.labels(
                 event_name=f"revalidation {"suc" if (revalidation_result == LoginResult.OK) else "unsuc"}"
