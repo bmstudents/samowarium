@@ -430,8 +430,9 @@ async def get_mail_body_by_id(context: SamowarePollingContext, uid: str) -> Mail
             raise HTTPError(
                 url=url, code=response.status, msg=(await response.text()), hdrs=None
             )
+
         tree = bs.BeautifulSoup((await response.text()), "html.parser")
-        mailBodiesHtml = tree.findAll("div", {"class": "samoware-RFC822-body"})
+        mailBodiesHtml = tree.findAll("td")
 
         text = ""
         for mailBodyHtml in mailBodiesHtml:
