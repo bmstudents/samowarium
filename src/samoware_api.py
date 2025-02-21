@@ -430,7 +430,7 @@ async def get_mail_body_by_id(context: SamowarePollingContext, uid: str) -> Mail
             raise HTTPError(
                 url=url, code=response.status, msg=(await response.text()), hdrs=None
             )
-        
+
         html_text = await response.text()
         print(html_text)
         tree = bs.BeautifulSoup(html_text, "html.parser")
