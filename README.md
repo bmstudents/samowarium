@@ -22,7 +22,7 @@ cd samowarium
 3. Запустить бота
 
 ```bash
-sudo docker compose up -d
+sudo docker compose up -d --pull
 ```
 
 4. Проверить, что все работает
