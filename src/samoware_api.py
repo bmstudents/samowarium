@@ -433,10 +433,33 @@ async def get_mail_body_by_id(context: SamowarePollingContext, uid: str) -> Mail
 
         tree = bs.BeautifulSoup((await response.text()), "html.parser")
         mailBodiesHtml = tree.findAll("td")
+        log.debug("mail response: " + str(tree.prettify()))
 
         text = ""
+        attachments = []
+
+        for link_a in tree.find_all("a"):
+            link_b = link_a.find("b")
+            if link_b is None or link_b.text.find("Приложение") == -1:
+                continue
+
+            attachment_url = (
+                "https://student.bmstu.ru" + link_a["href"]
+            )
+            file = await (
+                await http_session.get(
+                    attachment_url,
+                    timeout=HTTP_FILE_LOAD_TIMEOUT_SEC,
+                )
+            ).read()
+            name = link_a["href"].split("/")[-1]
+            attachments.append((file, name))
+
+        if len(attachments) != 0:
+            attachment_str = " ".join(name for (_, name) in attachments)
+            text += f"<em>Приложения к письму: {attachment_str}</em>"
+
         for mailBodyHtml in mailBodiesHtml:
-            log.debug("mail body: " + str(mailBodyHtml.encode()))
             foundTextBeg = False
             for element in mailBodyHtml.children:
                 if (
@@ -463,19 +486,6 @@ async def get_mail_body_by_id(context: SamowarePollingContext, uid: str) -> Mail
             text = text.replace("\n\xa0\n", "\n\n")
         text = re.sub(r"(\n){2,}", "\n\n", text).strip()
 
-        attachments = []
-        for attachment_html in tree.find_all("cg-message-attachment"):
-            attachment_url = (
-                "https://student.bmstu.ru" + attachment_html["attachment-ref"]
-            )
-            file = await (
-                await http_session.get(
-                    attachment_url,
-                    timeout=HTTP_FILE_LOAD_TIMEOUT_SEC,
-                )
-            ).read()
-            name = attachment_html["attachment-name"]
-            attachments.append((file, name))
         return MailBody(text, attachments)
 
 
