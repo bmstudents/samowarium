@@ -191,7 +191,11 @@ async def revalidate(login: str, session: str) -> SamowarePollingContext | None:
                 raise UnauthorizedError
             else:
                 raise HTTPError(
-                    url=url, code=response.status, msg=(await response.text()), hdrs=None, fp=None,
+                    url=url,
+                    code=response.status,
+                    msg=(await response.text()),
+                    hdrs=None,
+                    fp=None,
                 )
 
         if (
