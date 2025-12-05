@@ -443,9 +443,7 @@ async def get_mail_body_by_id(context: SamowarePollingContext, uid: str) -> Mail
             if link_b is None or link_b.text.find("Приложение") == -1:
                 continue
 
-            attachment_url = (
-                "https://student.bmstu.ru" + link_a["href"]
-            )
+            attachment_url = "https://student.bmstu.ru" + link_a["href"]
             file = await (
                 await http_session.get(
                     attachment_url,
