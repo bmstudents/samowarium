@@ -11,6 +11,7 @@ import bs4 as bs
 import xml.etree.ElementTree as ET
 from aiohttp import ClientSession, ClientTimeout
 from urllib.error import HTTPError
+import urllib.parse
 
 import env
 from const import (
@@ -458,7 +459,9 @@ async def get_mail_body_by_id(context: SamowarePollingContext, uid: str) -> Mail
             attachments.append((file, name))
 
         if len(attachments) != 0:
-            attachment_str = " ".join(name for (_, name) in attachments)
+            attachment_str = urllib.parse.unquote(
+                " ".join(name for (_, name) in attachments)
+            )
             text += f"<em>Приложения к письму: {attachment_str}</em>"
 
         for mailBodyHtml in mailBodiesHtml:
