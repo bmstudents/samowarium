@@ -89,4 +89,4 @@ def is_prometheus_metrics_server_enabled() -> bool:
 
 
 def get_browser_name() -> str:
-    return get_var_or_default("ENV", "Firefox 145")
+    return get_var_or_default("BROWSER", "Firefox 145")
