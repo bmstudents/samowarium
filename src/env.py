@@ -86,3 +86,6 @@ def is_debug() -> bool:
 
 def is_prometheus_metrics_server_enabled() -> bool:
     return get_var_or_default("ENABLE_PROMETHEUS_METRICS_SERVER", None) is not None
+
+def get_browser_name() -> str:
+    return get_var_or_default("ENV", "Firefox 145")

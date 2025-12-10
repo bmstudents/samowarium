@@ -351,7 +351,7 @@ async def set_session_info(context: SamowarePollingContext) -> SamowarePollingCo
             data={
                 "op": "setSessionInfo",
                 "paramType": "json",
-                "param": '{"platform":"Linux x86_64","clientName":"hSamoware","browser":"Firefox 122"}',
+                "param": f'{{"platform":"Linux x86_64","clientName":"hSamoware","browser":"{env.get_browser_name()}"\}}',
                 "session": context.session,
             },
         )
